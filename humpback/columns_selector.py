@@ -7,28 +7,39 @@ from sklearn.metrics import euclidean_distances
 
 class ColumnsSelector(BaseEstimator, TransformerMixin):
 
-    def __init__(self, base_estimator, information_criterion, choice_heuristic):
-        self.demo_param = demo_param
+    def __init__(self, information_criterion, choice_heuristic, stop_condition):
+        self.information_criterion = information_criterion
+        self.choice_heuristic = choice_heuristic
+        self.stop_condition = stop_condition
+        self.chosen_columns_ = None
 
     def fit(self, X, y):
+        # TODO preprocessing
+        self.choice_heuristic.fit(X, y)
+        subsets_gen = self.choice_heuristic.promising_subsets()
+        if self.stop_condition == 'max_all':
+            promising_subsets = list(subsets_gen)
+            ic_vals = [self.information_criterion(X[:, list(map(bool, s))], y[list(map(bool, s))]) for s in promising_subsets]
+            self.chosen_columns_ = promising_subsets[ic_vals.index(max(ic_vals))]
+        elif self.stop_condition == 'first_decreasing':
+            ic_val = -np.inf
+            while True:
+                try:
+                    subset = next(subsets_gen)
+                    new_val = self.information_criterion(X[:, list(map(bool, subset))], y[list(map(bool, subset))])
+                    if new_val > ic_val:
+                        self.chosen_columns_ = subset
+                        ic_val = new_val
+                    else:
+                        break
+                except StopIteration:
+                    break
+        else:
+            raise ValueError(f"stop_condition illegal value: '{self.stop_condition}'")
 
-        # Check that X and y have correct shape
-        X, y = check_X_y(X, y)
-        # Store the classes seen during fit
-        self.classes_ = unique_labels(y)
-
-        self.X_ = X
-        self.y_ = y
-        # Return the classifier
         return self
 
-    def transform(self, X, y=None):
-
-        # Check is fit had been called
-        check_is_fitted(self)
-
-        # Input validation
-        X = check_array(X)
-
-        closest = np.argmin(euclidean_distances(X, self.X_), axis=1)
-        return self.y_[closest]
+    def transform(self, X):
+        if self.chosen_columns_ is None:
+            raise RuntimeError(f'ColumnsSelector not fitted yet. Run fit or fit_tranform first!')
+        return X[:, list(map(bool, self.chosen_columns_))]
