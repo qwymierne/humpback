@@ -34,7 +34,7 @@ class ColumnsSelector(BaseEstimator, TransformerMixin):
         subsets_gen = self.choice_heuristic
         if self.stop_condition == 'max_all':
             promising_subsets = list(subsets_gen)
-            ic_vals = [self.information_criterion(X_i[:, list(map(bool, s))], y, columns_total=X_i.shape[1], k=k)
+            ic_vals = [self.information_criterion(X_i[:, list(map(bool, s))], y, m=X_i.shape[1], k=k)
                        for s in promising_subsets]
 
             best_columns = promising_subsets[ic_vals.index(max(ic_vals))]
@@ -42,7 +42,7 @@ class ColumnsSelector(BaseEstimator, TransformerMixin):
         elif self.stop_condition == 'first_decreasing':
             ic_val = -np.inf
             for subset in subsets_gen:
-                new_val = self.information_criterion(X_i[:, list(map(bool, subset))], y, columns_total=X_i.shape[1], k=k)
+                new_val = self.information_criterion(X_i[:, list(map(bool, subset))], y, m=X_i.shape[1], k=k)
                 if new_val > ic_val:
                     best_columns = subset
                     ic_val = new_val

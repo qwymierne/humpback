@@ -43,19 +43,19 @@ class ModifiedBayesianInformationCriterion(InformationCriterion):
         self.c1 = c1
         self.c2 = c2
 
-    def __call__(self, X, y, k, *args, **kwargs):
+    def __call__(self, X, y, m, k, *args, **kwargs):
         ll = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
         n, kq = X.shape
         q = kq - k
-        return ll - .5 * (k + q) * np.log(n) - k * np.log(n / self.c1 - 1) - q * np.log(n * (n - 1) / (2 * self.c2) - 1)
+        return ll - 0.5 * (k + q) * np.log(n) - k * np.log(m / self.c1 - 1) - q * np.log(m * (m - 1) / (2 * self.c2) - 1)
 
 
 class ModifiedBayesianInformationCriterion2(InformationCriterion):
 
-    def __call__(self, X, y, columns_total, *args, **kwargs):
+    def __call__(self, X, y, m, *args, **kwargs):
         ll = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
         n, k = X.shape
-        return 2 * ll - k * np.log(n) - 2 * k * np.log(columns_total / 4) + 2 * np.sum(np.log(np.arange(1, k + 1)))
+        return 2 * ll - k * np.log(n) - 2 * k * np.log(m / 4) + 2 * np.sum(np.log(np.arange(1, k + 1)))
 
 
 AIC = AkaikeInformationCriterion

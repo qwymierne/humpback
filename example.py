@@ -1,96 +1,78 @@
-from itertools import cycle
 import numpy as np
 import matplotlib.pyplot as plt
-
-from sklearn.linear_model import lasso_path, enet_path, LinearRegression
-from sklearn import datasets
+from sklearn.linear_model import LinearRegression
+from sklearn.datasets import fetch_openml
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 
 from humpback.heuristic import LassoPathHeuristic
 from humpback.information_criterion import AIC, BIC, mBIC, mBIC2
 from humpback.columns_selector import ColumnsSelector
 import humpback.mle_extetension
 
-X, y = datasets.load_diabetes(return_X_y=True)
+
+def example_1():
+    signal_space = np.linspace(0.01, 3.01, 50)
+    aic = AIC(LinearRegression())
+    bic = BIC(LinearRegression())
+    mbic = mBIC(LinearRegression(), 10, 95)
+    mbic2 = mBIC2(LinearRegression())
+    ics = {'aic': aic, 'bic': bic, 'mbic': mbic, 'mbic2': mbic2}
+    false_positives_ratio = {'aic': [], 'bic': [], 'mbic': [], 'mbic2': []}
+    false_negatives_ratio = {'aic': [], 'bic': [], 'mbic': [], 'mbic2': []}
+    for signal in tqdm(signal_space):
+        X = np.random.randn(100, 95)
+        beta = np.array([signal] * 10 + [0] * 85).reshape([-1, 1])
+        eps = np.random.randn(100, 1)
+        y = (X @ beta + eps).reshape(-1)
+
+        for ic in ics:
+            cs = ColumnsSelector(ics[ic], LassoPathHeuristic())
+            cs.fit(X, y)
+            false_positives_ratio[ic].append(sum(cs.chosen_columns_[10:]) / 85)
+            false_negatives_ratio[ic].append(1 - sum(cs.chosen_columns_[:10]) / 10)
+
+    for ic in false_positives_ratio:
+        plt.plot(signal_space, false_positives_ratio[ic], label=ic)
+    plt.title('False Positives Ratio')
+    plt.legend()
+    plt.show()
+
+    for ic in false_negatives_ratio:
+        plt.plot(signal_space, false_negatives_ratio[ic], label=ic)
+    plt.title('False Negatives Ratio')
+    plt.legend()
+    plt.show()
 
 
-X /= X.std(axis=0)  # Standardize data (easier to set the l1_ratio parameter)
+def example_2():
+    X, y = fetch_openml('mnist_784', version=1, return_X_y=True)
+    X = X[:5000]
+    y = y[:5000]
 
-# Compute paths
+    pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('aic_cs', ColumnsSelector(AIC(LinearRegression(fit_intercept=True)),
+                                   LassoPathHeuristic(fit_intercept=True),
+                                   interactions=False))])
 
-eps = 5e-3  # the smaller it is the longer is the path
+    for digit in '0123456789':
+        yd = np.where(y == digit, 1., 0.)
+        pipe.fit(X, yd)
+        cc = pipe['aic_cs'].chosen_columns_
 
-print("Computing regularization path using the lasso...")
-alphas_lasso, coefs_lasso, dg = lasso_path(X, y, eps=eps, fit_intercept=False)
-# print(alphas_lasso)
-prev = np.zeros((coefs_lasso.shape[0], 1))
-for c in np.where(coefs_lasso != 0., 1., 0.).T:
-    if (c != prev).any():
-        print(c)
-        prev = c
+        plt.imshow(cc.reshape((28, 28)), cmap='gray')
+        plt.title(f'Key pixels for {digit}')
+        plt.show()
 
-print('space')
-
-cs = ColumnsSelector(BIC(LinearRegression()), LassoPathHeuristic(), stop_condition='first_decreasing')
-cs.fit(X, y)
-print(cs.chosen_columns_)
-cs.transform(X)
-print(cs.transform(X).shape)
-
-
-print("Computing regularization path using the positive lasso...")
-alphas_positive_lasso, coefs_positive_lasso, _ = lasso_path(
-    X, y, eps=eps, positive=True, fit_intercept=False)
-
-# print(coefs_positive_lasso)
-
-print("Computing regularization path using the elastic net...")
-alphas_enet, coefs_enet, _ = enet_path(
-    X, y, eps=eps, l1_ratio=0.8, fit_intercept=False)
-
-print("Computing regularization path using the positive elastic net...")
-alphas_positive_enet, coefs_positive_enet, _ = enet_path(
-    X, y, eps=eps, l1_ratio=0.8, positive=True, fit_intercept=False)
-
-# Display results
-
-plt.figure(1)
-colors = cycle(['b', 'r', 'g', 'c', 'k'])
-neg_log_alphas_lasso = -np.log10(alphas_lasso)
-neg_log_alphas_enet = -np.log10(alphas_enet)
-for coef_l, coef_e, c in zip(coefs_lasso, coefs_enet, colors):
-    l1 = plt.plot(neg_log_alphas_lasso, coef_l, c=c)
-    l2 = plt.plot(neg_log_alphas_enet, coef_e, linestyle='--', c=c)
-
-plt.xlabel('-Log(alpha)')
-plt.ylabel('coefficients')
-plt.title('Lasso and Elastic-Net Paths')
-plt.legend((l1[-1], l2[-1]), ('Lasso', 'Elastic-Net'), loc='lower left')
-plt.axis('tight')
+        Xs = X[yd == 1., :]
+        avg_X = np.mean(Xs, axis=0)
+        plt.imshow(avg_X.reshape((28, 28)), cmap='gray')
+        plt.title(f'Average {digit}')
+        plt.show()
 
 
-plt.figure(2)
-neg_log_alphas_positive_lasso = -np.log10(alphas_positive_lasso)
-for coef_l, coef_pl, c in zip(coefs_lasso, coefs_positive_lasso, colors):
-    l1 = plt.plot(neg_log_alphas_lasso, coef_l, c=c)
-    l2 = plt.plot(neg_log_alphas_positive_lasso, coef_pl, linestyle='--', c=c)
-
-plt.xlabel('-Log(alpha)')
-plt.ylabel('coefficients')
-plt.title('Lasso and positive Lasso')
-plt.legend((l1[-1], l2[-1]), ('Lasso', 'positive Lasso'), loc='lower left')
-plt.axis('tight')
-
-
-plt.figure(3)
-neg_log_alphas_positive_enet = -np.log10(alphas_positive_enet)
-for (coef_e, coef_pe, c) in zip(coefs_enet, coefs_positive_enet, colors):
-    l1 = plt.plot(neg_log_alphas_enet, coef_e, c=c)
-    l2 = plt.plot(neg_log_alphas_positive_enet, coef_pe, linestyle='--', c=c)
-
-plt.xlabel('-Log(alpha)')
-plt.ylabel('coefficients')
-plt.title('Elastic-Net and positive Elastic-Net')
-plt.legend((l1[-1], l2[-1]), ('Elastic-Net', 'positive Elastic-Net'),
-           loc='lower left')
-plt.axis('tight')
-plt.show()
+if __name__ == '__main__':
+    # example_1()
+    example_2()
