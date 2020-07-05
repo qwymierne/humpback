@@ -1,6 +1,3 @@
-from _collections_abc import Generator
-from abc import ABC
-
 from sklearn.linear_model import lasso_path
 from sklearn.utils.validation import check_is_fitted
 import numpy as np
