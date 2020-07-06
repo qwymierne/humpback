@@ -31,8 +31,24 @@ def log_likelihood_in_mle(model, X, y, *args, **kwargs):
 
 
 def interactions_apply(X, apply_interaction, ic_requirements):
-    """TODO
-        """
+    """Calculates or no interactions between data and eventually concat them to data.
+    Parameters
+    ----------
+    X : {ndarray, sparse matrix} of (n_samples, n_features)
+        Data
+    apply_interaction : bool or None
+        Information whether interactions shall be applied or not. If None interactions are applied according to value of
+        ``ic_requirements``. If False and ``ic_requirements``= ``'required'`` error is raised
+    ic_requirements : {'independent', 'required'}
+        Determines behaviour if ``apply_interactions``=``None``. Also says what number should be considered as original
+        data size.
+    Returns
+    -------
+    ret : {ndarray, sparse matrix} of (n_samples, n_features)
+        Data with possibly
+    m : int
+        Size of original data, determined by ``ic_requirements``
+    """
     assert ic_requirements in ['independent', 'required']
     if apply_interaction is None:
         m = X.shape[1]
