@@ -12,26 +12,29 @@ from humpback.columns_selector import ColumnsSelector
 import humpback.mle_extetension
 
 
-def example_1():
-    signal_space = np.linspace(0.01, 3.01, 50)
+def example_1(repeats=10):
+    signal_space = np.linspace(0.01, 3.01, 30)
     aic = AIC(LinearRegression())
     bic = BIC(LinearRegression())
-    mbic = mBIC(LinearRegression(), 10, 95)
+    mbic = mBIC(LinearRegression(), 10, 1)
     mbic2 = mBIC2(LinearRegression())
     ics = {'aic': aic, 'bic': bic, 'mbic': mbic, 'mbic2': mbic2}
     false_positives_ratio = {'aic': [], 'bic': [], 'mbic': [], 'mbic2': []}
     false_negatives_ratio = {'aic': [], 'bic': [], 'mbic': [], 'mbic2': []}
     for signal in tqdm(signal_space):
-        X = np.random.randn(100, 95)
-        beta = np.array([signal] * 10 + [0] * 85).reshape([-1, 1])
-        eps = np.random.randn(100, 1)
-        y = (X @ beta + eps).reshape(-1)
-
         for ic in ics:
-            cs = ColumnsSelector(ics[ic], LassoPathHeuristic())
-            cs.fit(X, y)
-            false_positives_ratio[ic].append(sum(cs.chosen_columns_[10:]) / 85)
-            false_negatives_ratio[ic].append(1 - sum(cs.chosen_columns_[:10]) / 10)
+            fprs, fnrs = [], []
+            for _ in range(repeats):
+                X = np.random.randn(100, 95)
+                beta = np.array([signal] * 10 + [0] * 85).reshape([-1, 1])
+                eps = np.random.randn(100, 1)
+                y = (X @ beta + eps).reshape(-1)
+                cs = ColumnsSelector(ics[ic], LassoPathHeuristic())
+                cs.fit(X, y)
+                fprs.append(sum(cs.chosen_columns_[10:]) / 85)
+                fnrs.append(1 - sum(cs.chosen_columns_[:10]) / 10)
+            false_positives_ratio[ic].append(sum(fprs) / repeats)
+            false_negatives_ratio[ic].append(sum(fnrs) / repeats)
 
     for ic in false_positives_ratio:
         plt.plot(signal_space, false_positives_ratio[ic], label=ic)
@@ -53,14 +56,14 @@ def example_2():
 
     pipe = Pipeline([
         ('scaler', StandardScaler()),
-        ('aic_cs', ColumnsSelector(AIC(LinearRegression(fit_intercept=True)),
-                                   LassoPathHeuristic(fit_intercept=True),
-                                   interactions=False))])
+        ('mbic2_cs', ColumnsSelector(mBIC2(LinearRegression(fit_intercept=False)),
+                                     LassoPathHeuristic(fit_intercept=False),
+                                     interactions=False))])
 
     for digit in '0123456789':
         yd = np.where(y == digit, 1., 0.)
         pipe.fit(X, yd)
-        cc = pipe['aic_cs'].chosen_columns_
+        cc = pipe['mbic2_cs'].chosen_columns_
 
         plt.imshow(cc.reshape((28, 28)), cmap='gray')
         plt.title(f'Key pixels for {digit}')
@@ -74,5 +77,5 @@ def example_2():
 
 
 if __name__ == '__main__':
-    # example_1()
-    example_2()
+    example_1(2)
+    # example_2()
