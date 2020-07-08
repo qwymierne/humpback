@@ -18,13 +18,16 @@ def loglik_in_mle(self, X, y):
         -------
         ll : float
             Value of log(MLE) for Linear Regression model
+        params_num : int
+            Number of parameters in model
         """
     check_is_fitted(self)
+    n, k = X.shape
     pred_y = self.predict(X)
-    pred_y_var = np.var(y)
     residuals = y - pred_y
     rss = np.sum(np.square(residuals))
-    return -(X.shape[0] / 2) * np.log(2 * np.pi * pred_y_var) - rss / (2 * pred_y_var)
+    sigma2 = rss / n
+    return -(n / 2) * np.log(2 * np.pi * sigma2) - rss / (2 * sigma2), k + 2
 
 
 LinearRegression.loglik_in_mle = loglik_in_mle

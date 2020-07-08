@@ -13,10 +13,10 @@ import humpback.mle_extetension
 
 
 def example_1(repeats=10):
-    signal_space = np.linspace(0.01, 3.01, 30)
+    signal_space = np.linspace(0.01, 5.01, 50)
     aic = AIC(LinearRegression())
     bic = BIC(LinearRegression())
-    mbic = mBIC(LinearRegression(), 10, 1)
+    mbic = mBIC(LinearRegression(), 0.1, 0.01)
     mbic2 = mBIC2(LinearRegression())
     ics = {'aic': aic, 'bic': bic, 'mbic': mbic, 'mbic2': mbic2}
     false_positives_ratio = {'aic': [], 'bic': [], 'mbic': [], 'mbic2': []}
@@ -49,6 +49,18 @@ def example_1(repeats=10):
     plt.show()
 
 
+def show_important_pixels(mask, vals, label):
+    base = np.zeros(784) + 127
+    vi = iter(vals)
+    for i, m in enumerate(mask):
+        if m == 1.:
+            vv = next(vi)
+            base[i] = 255 if vv > 0 else 0
+    plt.imshow(base.reshape((28, 28)), cmap='gray')
+    plt.title(f'Key pixels for {label}')
+    plt.show()
+
+
 def example_2():
     X, y = fetch_openml('mnist_784', version=1, return_X_y=True)
     X = X[:5000]
@@ -59,15 +71,14 @@ def example_2():
         ('mbic2_cs', ColumnsSelector(mBIC2(LinearRegression(fit_intercept=False)),
                                      LassoPathHeuristic(fit_intercept=False),
                                      interactions=False))])
-
     for digit in '0123456789':
         yd = np.where(y == digit, 1., 0.)
         pipe.fit(X, yd)
         cc = pipe['mbic2_cs'].chosen_columns_
-
-        plt.imshow(cc.reshape((28, 28)), cmap='gray')
-        plt.title(f'Key pixels for {digit}')
-        plt.show()
+        X_trans = pipe.transform(X)
+        lr = LinearRegression().fit(X_trans, yd)
+        coefs = lr.coef_
+        show_important_pixels(cc, coefs, digit)
 
         Xs = X[yd == 1., :]
         avg_X = np.mean(Xs, axis=0)
@@ -77,5 +88,5 @@ def example_2():
 
 
 if __name__ == '__main__':
-    example_1(2)
+    example_1(10)
     # example_2()

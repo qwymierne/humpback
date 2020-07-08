@@ -57,9 +57,9 @@ class AkaikeInformationCriterion(InformationCriterion):
             (n_samples, n_targets)
             Target. Will be cast to ``X``'s dtype if necessary
         """
-        ll = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
+        ll, params_num = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
 
-        return 2 * ll - 2 * X.shape[1]
+        return 2 * ll - 2 * params_num
 
 
 class BayesianInformationCriterion(InformationCriterion):
@@ -88,10 +88,10 @@ class BayesianInformationCriterion(InformationCriterion):
             (n_samples, n_targets)
             Target. Will be cast to ``X``'s dtype if necessary
         """
-        ll = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
+        ll, params_num = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
 
-        n, k = X.shape
-        return 2 * ll - k * np.log(n)
+        n, _ = X.shape
+        return 2 * ll - params_num * np.log(n)
 
 
 class ModifiedBayesianInformationCriterion(InformationCriterion):
@@ -109,10 +109,10 @@ class ModifiedBayesianInformationCriterion(InformationCriterion):
     model : object
         model which is capable of running ``fit``, ``predict`` and one of ``loglik_in_mle``, ``likelihood_in_mle``
         methods. It is base for calculating IC value for dataset
-    c1 : float
-        initial guess of number of important features in original array
-    c2 : float
-        initial guess of number of important interactions between columns in original array
+    p1 : float
+        initial guess of proportion of important features in original array
+    p2 : float
+        initial guess of proportion of important interactions between columns in original array
 
     Class attributes
     ----------
@@ -120,10 +120,10 @@ class ModifiedBayesianInformationCriterion(InformationCriterion):
     """
     _interactions = 'required'
 
-    def __init__(self, model, c1, c2):
+    def __init__(self, model, p1, p2):
         super().__init__(model)
-        self.c1 = c1
-        self.c2 = c2
+        self.p1 = p1
+        self.p2 = p2
 
     def __call__(self, X, y, m, k, *args, **kwargs):
         """Calculates value of mBIC on presented dataset, which should be subset of greater
@@ -142,11 +142,13 @@ class ModifiedBayesianInformationCriterion(InformationCriterion):
         k : int
             number of chosen original features
         """
-        ll = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
+        ll, params_num = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
         n, kq = X.shape
         q = kq - k
+        c1 = self.p1 * m
         Ne = m * (m - 1) / 2
-        return ll - 0.5 * kq * np.log(n) - k * np.log(m / self.c1 - 1) - q * np.log(Ne / self.c2 - 1)
+        c2 = self.p2 * Ne
+        return ll - 0.5 * params_num * np.log(n) - k * np.log(m / c1 - 1) - q * np.log(Ne / c2 - 1)
 
 
 class ModifiedBayesianInformationCriterion2(InformationCriterion):
@@ -180,9 +182,9 @@ class ModifiedBayesianInformationCriterion2(InformationCriterion):
         m : int
             number of columns in original data
         """
-        ll = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
+        ll, params_num = log_likelihood_in_mle(self.model, X, y, *args, **kwargs)
         n, k = X.shape
-        return 2 * ll - k * np.log(n) - 2 * k * np.log(m / 4) + 2 * np.sum(np.log(np.arange(1, k + 1)))
+        return 2 * ll - params_num * np.log(n) - 2 * k * np.log(m / 4) + 2 * np.sum(np.log(np.arange(1, k + 1)))
 
 
 AIC = AkaikeInformationCriterion
